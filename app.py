@@ -13,24 +13,39 @@ from skfuzzy import control as ctrl
 # -----------------------------
 def ambil_data(symbol, period, interval):
     data = yf.download(symbol, period=period, interval=interval, progress=False)
+    if data.empty:
+        return pd.DataFrame()
+
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
+
     data = data[['Close']].asfreq('B').fillna(method='ffill')
+    data.dropna(inplace=True)
     return data
 
 # -----------------------------
 # 2. Bangun model ARIMA
 # -----------------------------
 def bangun_model_arima(data, order=(3,1,2), hari_prediksi=10):
-    model = ARIMA(data['Close'], order=order)
-    fitted = model.fit()
-    forecast = fitted.forecast(steps=hari_prediksi)
-    return forecast
+    if data.empty or 'Close' not in data:
+        return None
+
+    try:
+        model = ARIMA(data['Close'], order=order)
+        fitted = model.fit()
+        forecast = fitted.forecast(steps=hari_prediksi)
+        return forecast
+    except Exception as e:
+        st.error(f"❌ Gagal membangun model ARIMA: {e}")
+        return None
 
 # -----------------------------
 # 3. Gabungkan data aktual + prediksi
 # -----------------------------
 def gabungkan_data(data, forecast):
+    if forecast is None:
+        return data, pd.DataFrame()
+
     last_date = data.index[-1]
     pred_dates = pd.bdate_range(last_date + timedelta(1), periods=len(forecast))
     df_forecast = pd.DataFrame(forecast.values, index=pred_dates, columns=["Close"])
@@ -42,6 +57,10 @@ def gabungkan_data(data, forecast):
 # 4. Visualisasi Harga + Prediksi
 # -----------------------------
 def plot_prediksi(data, forecast, symbol):
+    if forecast is None or data.empty:
+        st.warning("Tidak ada data untuk ditampilkan.")
+        return
+
     last_date = data.index[-1]
     pred_dates = pd.bdate_range(last_date + timedelta(1), periods=len(forecast))
 
@@ -60,6 +79,10 @@ def plot_prediksi(data, forecast, symbol):
 # 5. Analisis Fuzzy
 # -----------------------------
 def analisis_fuzzy(data_gabungan, symbol):
+    if data_gabungan.empty:
+        st.warning("Data gabungan kosong, tidak dapat melakukan analisis fuzzy.")
+        return
+
     data = data_gabungan.copy()
     data['Return'] = data['Close'].pct_change() * 100
     data.dropna(inplace=True)
@@ -155,7 +178,11 @@ interval = st.selectbox("Pilih Interval:", ["1d", "1wk"])
 
 if st.button("🔮 Jalankan Analisis"):
     data = ambil_data(symbol, periode, interval)
-    forecast = bangun_model_arima(data)
-    data_gabungan, df_prediksi = gabungkan_data(data, forecast)
-    plot_prediksi(data, forecast, symbol)
-    analisis_fuzzy(data_gabungan, symbol)
+    if data.empty:
+        st.error("❌ Tidak ada data untuk simbol dan periode ini.")
+    else:
+        forecast = bangun_model_arima(data)
+        if forecast is not None:
+            data_gabungan, df_prediksi = gabungkan_data(data, forecast)
+            plot_prediksi(data, forecast, symbol)
+            analisis_fuzzy(data_gabungan, symbol)
