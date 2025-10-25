@@ -93,7 +93,7 @@ def analisis_fuzzy(data_gabungan):
         fuzzy_values.append(nilai)
         if nilai < 33:
             decisions.append("JUAL")
-        elif nilai < 40:
+        elif nilai < 66:
             decisions.append("TAHAN")
         else:
             decisions.append("BELI")
