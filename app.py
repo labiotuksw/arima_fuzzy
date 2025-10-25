@@ -117,6 +117,25 @@ with col1:
         "PEPE-USD": "Pepe Coin (PEPE)",
         "XRP-USD": "Ripple (XRP)",
         "SOL-USD": "Solana (SOL)"
+        "BBCA.JK": "Bank Central Asia",
+        "BBRI.JK": "Bank Rakyat Indonesia",
+        "BMRI.JK": "Bank Mandiri",
+        "TLKM.JK": "Telkom Indonesia",
+        "UNVR.JK": "Unilever Indonesia",
+        "ASII.JK": "Astra International",
+        "ICBP.JK": "Indofood CBP",
+        "INDF.JK": "Indofood Sukses Makmur",
+        "KLBF.JK": "Kalbe Farma",
+        "ANTM.JK": "Aneka Tambang",
+        "INCO.JK": "Vale Indonesia",
+        "ADRO.JK": "Adaro Energy",
+        "PTBA.JK": "Bukit Asam",
+        "CPIN.JK": "Charoen Pokphand",
+        "ITMG.JK": "Indo Tambangraya Megah",
+        "ARTO.JK": "Bank Jago",
+        "BFIN.JK": "BFI Finance",
+        "GOTO.JK": "GoTo Gojek Tokopedia",
+        "MEGA.JK": "Bank Mega"
     })
 with col2:
     periode = st.selectbox("🕒 Periode Data", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"], index=4)
