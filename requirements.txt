@@ -1,8 +1,7 @@
-%%writefile requirements.txt
 streamlit
+yfinance
 pandas
 numpy
 matplotlib
 statsmodels
-yfinance
 scikit-fuzzy
