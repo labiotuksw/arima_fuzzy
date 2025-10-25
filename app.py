@@ -27,7 +27,7 @@ def bangun_model_arima(data, order=(3,1,2), hari_prediksi=10):
     model = ARIMA(data['Close'], order=order)
     fitted = model.fit()
     forecast = fitted.forecast(steps=hari_prediksi)
-    return forecast
+    return forecast, fitted
 
 # -----------------------------
 # 3. Gabungkan data aktual + prediksi
@@ -48,10 +48,12 @@ def analisis_fuzzy(data_gabungan):
     data['Return'] = data['Close'].pct_change() * 100
     data.dropna(inplace=True)
 
+    # Variabel fuzzy
     harga = ctrl.Antecedent(np.linspace(data['Close'].min(), data['Close'].max(), 100), 'harga')
     perubahan = ctrl.Antecedent(np.linspace(data['Return'].min(), data['Return'].max(), 100), 'perubahan')
     sinyal = ctrl.Consequent(np.arange(0, 101, 1), 'sinyal')
 
+    # Fungsi keanggotaan
     harga['rendah'] = fuzz.trimf(harga.universe, [data['Close'].min(), data['Close'].min(), data['Close'].mean()])
     harga['normal'] = fuzz.trimf(harga.universe, [data['Close'].min(), data['Close'].mean(), data['Close'].max()])
     harga['tinggi'] = fuzz.trimf(harga.universe, [data['Close'].mean(), data['Close'].max(), data['Close'].max()])
@@ -64,6 +66,7 @@ def analisis_fuzzy(data_gabungan):
     sinyal['tahan'] = fuzz.trimf(sinyal.universe, [25, 50, 75])
     sinyal['beli'] = fuzz.trimf(sinyal.universe, [50, 100, 100])
 
+    # Aturan fuzzy
     rules = [
         ctrl.Rule(harga['rendah'] & perubahan['naik'], sinyal['beli']),
         ctrl.Rule(harga['normal'] & perubahan['stabil'], sinyal['tahan']),
@@ -97,7 +100,7 @@ def analisis_fuzzy(data_gabungan):
 # 5. Streamlit UI
 # -----------------------------
 st.title("📊 ARIMA + Fuzzy Logic Stock Forecasting")
-st.write("Prediksi harga saham/crypto menggunakan ARIMA dan logika fuzzy untuk sinyal beli/jual/tahan.")
+st.write("Prediksi harga saham/crypto menggunakan ARIMA dan logika fuzzy untuk sinyal beli/jual/tahan berdasarkan hasil prediksi.")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -120,9 +123,10 @@ with col3:
 if st.button("🚀 Jalankan Analisis"):
     with st.spinner("Mengambil data dan menjalankan model..."):
         data = ambil_data(symbol, periode, interval)
-        forecast = bangun_model_arima(data)
+        forecast, fitted = bangun_model_arima(data)
         data_gabungan, df_prediksi = gabungkan_data(data, forecast)
 
+        # Plot harga dan prediksi
         st.subheader("📈 Grafik Harga Aktual & Prediksi ARIMA")
         fig, ax = plt.subplots(figsize=(12,5))
         ax.plot(data.index, data['Close'], label='Harga Aktual', color='blue')
@@ -131,15 +135,21 @@ if st.button("🚀 Jalankan Analisis"):
         ax.grid(True, linestyle="--", alpha=0.5)
         st.pyplot(fig)
 
+        # Jalankan fuzzy logic
         df_fuzzy = analisis_fuzzy(data_gabungan)
-        st.subheader("🤖 Hasil Analisis Fuzzy Logic")
+
+        # Tampilkan hasil fuzzy
+        st.subheader("🤖 Hasil Analisis Fuzzy Logic (Gabungan Aktual + Prediksi)")
         st.line_chart(df_fuzzy[["Close", "FuzzySignal"]])
 
-        latest = df_fuzzy.iloc[-1]
+        # Ambil hasil fuzzy dari prediksi terakhir
+        pred_fuzzy = df_fuzzy.loc[df_prediksi.index.intersection(df_fuzzy.index)]
+        latest_pred = pred_fuzzy.iloc[-1]
+
         st.markdown(f"""
-        ### 📌 Rekomendasi Terakhir:
-        - 💰 Harga: **{latest['Close']:.2f}**
-        - 📉 Perubahan: **{latest['Return']:.2f}%**
-        - 🎚️ Nilai Fuzzy: **{latest['FuzzySignal']:.2f}**
-        - 🟢 **Sinyal: {latest['Decision']}**
+        ### 📌 Rekomendasi Berdasarkan Prediksi Terbaru ({latest_pred.name.date()}):
+        - 💰 Prediksi Harga: **{latest_pred['Close']:.2f}**
+        - 📉 Perubahan Estimasi: **{latest_pred['Return']:.2f}%**
+        - 🎚️ Nilai Fuzzy: **{latest_pred['FuzzySignal']:.2f}**
+        - 🟢 **Rekomendasi: {latest_pred['Decision']}**
         """)
