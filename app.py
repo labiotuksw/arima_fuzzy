@@ -116,7 +116,7 @@ with col1:
         "DOGE-USD": "Dogecoin (DOGE)",
         "PEPE-USD": "Pepe Coin (PEPE)",
         "XRP-USD": "Ripple (XRP)",
-        "SOL-USD": "Solana (SOL)"
+        "SOL-USD": "Solana (SOL)",
         "BBCA.JK": "Bank Central Asia",
         "BBRI.JK": "Bank Rakyat Indonesia",
         "BMRI.JK": "Bank Mandiri",
