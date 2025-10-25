@@ -1,51 +1,38 @@
-import streamlit as st
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
 from statsmodels.tsa.arima.model import ARIMA
+import matplotlib.pyplot as plt
 from datetime import timedelta
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
+import streamlit as st
+
+st.set_page_config(page_title="ARIMA + Fuzzy Logic", layout="wide")
 
 # -----------------------------
 # 1. Ambil data dari yfinance
 # -----------------------------
 def ambil_data(symbol, period, interval):
     data = yf.download(symbol, period=period, interval=interval, progress=False)
-    if data.empty:
-        return pd.DataFrame()
-
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
-
     data = data[['Close']].asfreq('B').fillna(method='ffill')
-    data.dropna(inplace=True)
     return data
 
 # -----------------------------
 # 2. Bangun model ARIMA
 # -----------------------------
 def bangun_model_arima(data, order=(3,1,2), hari_prediksi=10):
-    if data.empty or 'Close' not in data:
-        return None
-
-    try:
-        model = ARIMA(data['Close'], order=order)
-        fitted = model.fit()
-        forecast = fitted.forecast(steps=hari_prediksi)
-        return forecast
-    except Exception as e:
-        st.error(f"❌ Gagal membangun model ARIMA: {e}")
-        return None
+    model = ARIMA(data['Close'], order=order)
+    fitted = model.fit()
+    forecast = fitted.forecast(steps=hari_prediksi)
+    return forecast
 
 # -----------------------------
 # 3. Gabungkan data aktual + prediksi
 # -----------------------------
 def gabungkan_data(data, forecast):
-    if forecast is None:
-        return data, pd.DataFrame()
-
     last_date = data.index[-1]
     pred_dates = pd.bdate_range(last_date + timedelta(1), periods=len(forecast))
     df_forecast = pd.DataFrame(forecast.values, index=pred_dates, columns=["Close"])
@@ -54,35 +41,9 @@ def gabungkan_data(data, forecast):
     return data_gabungan, df_forecast
 
 # -----------------------------
-# 4. Visualisasi Harga + Prediksi
+# 4. Analisis Fuzzy
 # -----------------------------
-def plot_prediksi(data, forecast, symbol):
-    if forecast is None or data.empty:
-        st.warning("Tidak ada data untuk ditampilkan.")
-        return
-
-    last_date = data.index[-1]
-    pred_dates = pd.bdate_range(last_date + timedelta(1), periods=len(forecast))
-
-    fig, ax = plt.subplots(figsize=(14,6))
-    ax.plot(data.index, data['Close'], label='Harga Aktual', marker='o', color='blue')
-    ax.plot(pred_dates, forecast, label='Prediksi ARIMA (10 Hari)', marker='x', linestyle='--', color='orange')
-
-    ax.set_title(f"📈 Harga Aktual & Prediksi ARIMA — {symbol}")
-    ax.set_xlabel("Tanggal")
-    ax.set_ylabel("Harga Penutupan")
-    ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend()
-    st.pyplot(fig)
-
-# -----------------------------
-# 5. Analisis Fuzzy
-# -----------------------------
-def analisis_fuzzy(data_gabungan, symbol):
-    if data_gabungan.empty:
-        st.warning("Data gabungan kosong, tidak dapat melakukan analisis fuzzy.")
-        return
-
+def analisis_fuzzy(data_gabungan):
     data = data_gabungan.copy()
     data['Return'] = data['Close'].pct_change() * 100
     data.dropna(inplace=True)
@@ -130,59 +91,55 @@ def analisis_fuzzy(data_gabungan, symbol):
 
     data["FuzzySignal"] = fuzzy_values
     data["Decision"] = decisions
-
-    fig, ax = plt.subplots(figsize=(14,6))
-    ax.plot(data.index, data['Close'], label='Harga', color='blue')
-    ax.plot(data.index, data['FuzzySignal'], label='Nilai Fuzzy (0–100)', color='cyan', linewidth=2)
-    ax.axhspan(0, 33, color='red', alpha=0.1)
-    ax.axhspan(33, 66, color='yellow', alpha=0.1)
-    ax.axhspan(66, 100, color='green', alpha=0.1)
-    ax.set_title(f"📊 Sinyal Fuzzy Logic: {symbol}")
-    ax.set_xlabel("Tanggal")
-    ax.set_ylabel("Harga & Nilai Fuzzy")
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.3)
-    st.pyplot(fig)
-
-    latest = data.iloc[-1]
-    st.markdown(f"""
-    ### 📌 Analisis Terakhir ({symbol})
-    - 💰 Harga: **{latest['Close']:.2f}**
-    - 📉 Perubahan: **{latest['Return']:.2f}%**
-    - 🎚️ Nilai Fuzzy: **{latest['FuzzySignal']:.2f}**
-    - 🟢 Rekomendasi: **{latest['Decision']}**
-    """)
-
-    st.dataframe(data.tail(10))
+    return data
 
 # -----------------------------
-# 6. UI Streamlit
+# 5. Streamlit UI
 # -----------------------------
-st.set_page_config(page_title="ARIMA + Fuzzy Stock Forecast", layout="wide")
+st.title("📊 ARIMA + Fuzzy Logic Stock Forecasting")
+st.write("Prediksi harga saham/crypto menggunakan ARIMA dan logika fuzzy untuk sinyal beli/jual/tahan.")
 
-st.title("📈 Prediksi Harga & Analisis Fuzzy")
-symbol = st.selectbox("Pilih Aset:", {
-    "Gold Futures": "GC=F",
-    "Bitcoin (USD)": "BTC-USD",
-    "Crude Oil WTI": "CL=F",
-    "S&P 500": "^GSPC",
-    "Ethereum (ETH)": "ETH-USD",
-    "Dogecoin (DOGE)": "DOGE-USD",
-    "Pepe Coin (PEPE)": "PEPE-USD",
-    "Ripple (XRP)": "XRP-USD",
-    "Solana (SOL)": "SOL-USD"
-})
+col1, col2, col3 = st.columns(3)
+with col1:
+    symbol = st.selectbox("Pilih Aset", {
+        "GC=F": "Gold Futures",
+        "BTC-USD": "Bitcoin (USD)",
+        "CL=F": "Crude Oil WTI",
+        "^GSPC": "S&P 500",
+        "ETH-USD": "Ethereum (ETH)",
+        "DOGE-USD": "Dogecoin (DOGE)",
+        "PEPE-USD": "Pepe Coin (PEPE)",
+        "XRP-USD": "Ripple (XRP)",
+        "SOL-USD": "Solana (SOL)"
+    })
+with col2:
+    periode = st.selectbox("Periode", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"], index=4)
+with col3:
+    interval = st.selectbox("Interval", ["1d", "1wk"], index=0)
 
-periode = st.selectbox("Pilih Periode:", ["1mo","3mo","6mo","1y","2y","5y"])
-interval = st.selectbox("Pilih Interval:", ["1d", "1wk"])
-
-if st.button("🔮 Jalankan Analisis"):
-    data = ambil_data(symbol, periode, interval)
-    if data.empty:
-        st.error("❌ Tidak ada data untuk simbol dan periode ini.")
-    else:
+if st.button("🚀 Jalankan Analisis"):
+    with st.spinner("Mengambil data dan menjalankan model..."):
+        data = ambil_data(symbol, periode, interval)
         forecast = bangun_model_arima(data)
-        if forecast is not None:
-            data_gabungan, df_prediksi = gabungkan_data(data, forecast)
-            plot_prediksi(data, forecast, symbol)
-            analisis_fuzzy(data_gabungan, symbol)
+        data_gabungan, df_prediksi = gabungkan_data(data, forecast)
+
+        st.subheader("📈 Grafik Harga Aktual & Prediksi ARIMA")
+        fig, ax = plt.subplots(figsize=(12,5))
+        ax.plot(data.index, data['Close'], label='Harga Aktual', color='blue')
+        ax.plot(df_prediksi.index, df_prediksi['Close'], label='Prediksi ARIMA', linestyle='--', color='orange')
+        ax.legend()
+        ax.grid(True, linestyle="--", alpha=0.5)
+        st.pyplot(fig)
+
+        df_fuzzy = analisis_fuzzy(data_gabungan)
+        st.subheader("🤖 Hasil Analisis Fuzzy Logic")
+        st.line_chart(df_fuzzy[["Close", "FuzzySignal"]])
+
+        latest = df_fuzzy.iloc[-1]
+        st.markdown(f"""
+        ### 📌 Rekomendasi Terakhir:
+        - 💰 Harga: **{latest['Close']:.2f}**
+        - 📉 Perubahan: **{latest['Return']:.2f}%**
+        - 🎚️ Nilai Fuzzy: **{latest['FuzzySignal']:.2f}**
+        - 🟢 **Sinyal: {latest['Decision']}**
+        """)
